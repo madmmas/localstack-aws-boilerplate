@@ -1,0 +1,40 @@
+name: Test Lambdas
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'lambdas/**'
+      - 'Makefile'
+      - '.github/workflows/test-lambdas.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'lambdas/**'
+      - 'Makefile'
+      - '.github/workflows/test-lambdas.yml'
+
+jobs:
+  test-lambdas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@4
+
+      - name: Set up Python
+        uses: actions/setup-python@5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('lambdas/hello/pyproject.toml', 'lambdas/health/pyproject.toml') }}
+
+      - name: Run Lambda tests
+        run: make test-lambdas
