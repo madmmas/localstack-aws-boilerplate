@@ -1,0 +1,60 @@
+---
+description: Production-grade AWS Lambda best practices (Python, Powertools, structure, testing)
+globs: lambdas/**/*.py, iac/lambda.tf
+alwaysApply: false
+---
+
+# Production-Grade Lambda Rules
+
+## Structure
+
+- **One Lambda per folder** under `lambdas/<name>/`: `handler.py`, `pyproject.toml`, `tests/`.
+- **Single entrypoint**: `handler.lambda_handler` (handler module at package root; Terraform handler = `handler.lambda_handler`).
+- **Shared deps via layer or bundle**: Use a shared layer (e.g. Powertools) or bundle deps in the zip for LocalStack compatibility.
+
+## Observability (Powertools)
+
+- **Logger**: Use `aws_lambda_powertools.Logger(service_name="<function-name>")`. Decorate handler with `@logger.inject_lambda_context`. Do not use `extra={"name": ...}` (reserved); use e.g. `extra={"greeting_name": ...}`.
+- **Metrics**: Use `aws_lambda_powertools.Metrics(namespace="...", service="...")`. Decorate with `@metrics.log_metrics(capture_cold_start_metric=True)`. Add custom metrics with `metrics.add_metric(name="...", unit="Count", value=1)`. Namespace is required.
+- **Typing**: Use `from aws_lambda_powertools.utilities.typing import LambdaContext` and type handler as `(event: dict, context: LambdaContext) -> dict`.
+
+## Configuration and clients
+
+- **Read from env**: Use `os.environ.get("VAR", "default")` for endpoint URLs, table names, feature flags. No hardcoded resources.
+- **Build clients inside handler or lazy**: Construct boto3 clients/resources inside the handler or in a function called from the handler (not at module top-level) so tests can inject mocks (e.g. moto) and so `endpoint_url` can be omitted when `TESTING=1` for unit tests.
+- **LocalStack**: Set `DYNAMODB_ENDPOINT` / `LOCALSTACK_HOSTNAME` in Terraform to the compose service name (e.g. `localstack-us-east-1`) so the Lambda container can resolve the hostname.
+
+## Error handling
+
+- **Structured error responses**: Return `statusCode` 4xx/5xx with a JSON body containing `error`, `error_type`, and optional `traceback` when `DEBUG=true`.
+- **Log before return**: Use `logger.exception("...")` or `logger.error("...", extra={"error": str(e)})` before returning an error response.
+- **Metrics**: Add a failure metric (e.g. `metrics.add_metric(name="HealthCheckFailure", unit="Count", value=1)`) in exception paths.
+
+## Idempotency and timeouts
+
+- **Idempotent writes**: Prefer idempotent operations (e.g. PutItem with deterministic keys) where retries are possible.
+- **Timeout**: Set `timeout` in Terraform (e.g. 10–30 s for DB/HTTP calls); avoid default 3 s for anything that does I/O.
+
+## Testing
+
+- **Unit tests**: `tests/test_handler.py` with pytest; require coverage (e.g. `fail_under = 80` in pyproject.toml).
+- **Mock AWS**: Use `moto` (e.g. `@mock_aws`) for boto3. Create tables/resources in test; set `TESTING=1` (and optionally clear `DYNAMODB_ENDPOINT`) so the handler uses default boto3 and moto can patch.
+- **No pytest in handler code**: Do not import `pytest` in handler; use it only in tests.
+
+## Packaging and deployment
+
+- **Zip contents**: Deployment zip must have `handler.py` at root and dependencies either in a layer (AWS) or bundled at zip root (e.g. `aws_lambda_powertools/` at root for LocalStack). Lambda runtime adds `/var/task` to `PYTHONPATH`, so packages must be at `/var/task` (not only under `python/` in the zip unless using a layer).
+- **pyproject.toml**: Use `[tool.hatch.build.targets.wheel]` with `only-include = ["handler.py"]` for flat layout. Include `aws-lambda-powertools` in dependencies; use a layer or bundle for deployment.
+- **Linting**: Run ruff (e.g. `ruff check .`) with a consistent config; fix I001 (import order), F401 (unused imports), UP017 (e.g. `timezone.utc` vs `datetime.UTC` for compatibility).
+
+## Terraform (when adding or changing Lambdas)
+
+- **Handler**: Set `handler = "handler.lambda_handler"` and `runtime = "python3.11"`.
+- **Env vars**: Pass table names, endpoints, and region via `environment { variables = { ... } }`. No secrets in Terraform; use SSM/Secrets Manager in production.
+- **Timeout**: Set `timeout` for functions that call DynamoDB or HTTP.
+- **LocalStack**: For LocalStack, bundle Powertools in the deployment zip and omit layers so the function runs without layer mount issues.
+
+## Security and secrets
+
+- **No secrets in code or Terraform**: Use environment variables or Parameter Store/Secrets Manager; reference in Terraform or fetch at runtime with Powertools Parameters.
+- **Least privilege**: Attach only the IAM policies the function needs (e.g. `lambda_execution`, DynamoDB table access); scope by resource ARN where possible.
