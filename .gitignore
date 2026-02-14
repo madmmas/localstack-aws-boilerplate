@@ -13,8 +13,11 @@ iac/*.tfvars
 # LocalStack
 .localstack/
 
-# Lambda packages
+# Lambda packages and build
 lambdas/*.zip
+lambdas/dist/
+lambdas/layer/build/
+lambdas/dist/staging_*/
 
 # Python
 __pycache__/
@@ -23,6 +26,7 @@ __pycache__/
 *.so
 .Python
 venv/
+.venv/
 env/
 ENV/
 

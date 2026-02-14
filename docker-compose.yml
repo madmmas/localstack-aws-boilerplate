@@ -1,7 +1,5 @@
 # Base: shared network only. Use compose overrides for services.
-# Example: docker-compose -f docker-compose.yml -f docker-compose.localstack-us-east-1.yml up -d
-
-version: '3.8'
+# Example: docker-compose -f docker-compose.yml -f compose/localstack-us-east-1.yml up -d
 
 networks:
   localstack-network:

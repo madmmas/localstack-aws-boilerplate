@@ -1,28 +1,27 @@
-# Lambda function for hello endpoint
+# Lambda function for hello endpoint (Powertools bundled in zip for LocalStack layer compatibility)
 resource "aws_lambda_function" "hello_lambda" {
-  filename         = "../lambdas/hello_lambda.zip"
-  function_name    = "hello-lambda"
+  filename         = "../lambdas/dist/hello_lambda.zip"
+  function_name   = "hello-lambda"
   role            = aws_iam_role.lambda_role.arn
-  handler         = "lambda_function.lambda_handler"
+  handler         = "handler.lambda_handler"
   runtime         = "python3.11"
-  source_code_hash = filebase64sha256("../lambdas/hello_lambda.zip")
+  source_code_hash = filebase64sha256("../lambdas/dist/hello_lambda.zip")
 
   depends_on = [aws_iam_role_policy_attachment.lambda_policy]
 }
 
-# Lambda function for health check endpoint
+# Lambda function for health check endpoint (Powertools bundled in zip for LocalStack layer compatibility)
 resource "aws_lambda_function" "health_lambda" {
-  filename         = "../lambdas/health_lambda.zip"
-  function_name    = "health-lambda"
+  filename         = "../lambdas/dist/health_lambda.zip"
+  function_name   = "health-lambda"
   role            = aws_iam_role.lambda_role.arn
-  handler         = "health_lambda.lambda_handler"
+  handler         = "handler.lambda_handler"
   runtime         = "python3.11"
   timeout         = 10
-  source_code_hash = filebase64sha256("../lambdas/health_lambda.zip")
+  source_code_hash = filebase64sha256("../lambdas/dist/health_lambda.zip")
 
   environment {
     variables = {
-      # Must match compose service name so Lambda container can resolve hostname
       DYNAMODB_ENDPOINT   = "http://localstack-us-east-1:4566"
       LOCALSTACK_HOSTNAME = "localstack-us-east-1"
       HEALTH_TABLE_NAME   = aws_dynamodb_table.health_table.name

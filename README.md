@@ -6,7 +6,8 @@ This project demonstrates a simple setup using LocalStack to run AWS Lambda func
 
 - Docker and Docker Compose
 - Terraform (>= 1.0)
-- Python 3.11 (for Lambda function)
+- Python 3.11 (for Lambda functions)
+- [uv](https://docs.astral.sh/uv/) (recommended for Lambdas) or pip
 - curl (for testing)
 
 ## Project Structure
@@ -30,10 +31,20 @@ This project demonstrates a simple setup using LocalStack to run AWS Lambda func
 │   ├── lambda.tf           # Lambda functions
 │   ├── api_gateway.tf      # API Gateway resources
 │   └── outputs.tf          # Terraform outputs
-├── lambdas/                # Lambda function code
-│   ├── lambda_function.py  # Hello Lambda function
-│   └── health_lambda.py    # Health check Lambda function
-├── Makefile                # Helper commands (compose, Terraform, test)
+├── lambdas/                # Lambda functions (each in its own folder)
+│   ├── layer/              # Shared Lambda layer (Powertools: Log + Metrics)
+│   │   ├── requirements.txt
+│   │   └── README.md
+│   ├── dist/                # Built artifacts (layer.zip, *_lambda.zip); gitignored
+│   ├── hello/               # Hello Lambda (uv, pytest, ruff)
+│   │   ├── pyproject.toml
+│   │   ├── handler.py
+│   │   └── tests/
+│   └── health/              # Health Lambda (DynamoDB, moto, pytest, ruff)
+│       ├── pyproject.toml
+│       ├── handler.py
+│       └── tests/
+├── Makefile                # Helper commands (compose, Terraform, package, test, lint)
 ├── README.md               # This file
 └── .gitignore              # Git ignore rules
 ```
@@ -88,19 +99,13 @@ Terraform and the API examples below use **us-east-1** (port 4566) by default.
 
 ### 2. Package Lambda Functions
 
-Create zip files for both Lambda functions:
-
-```bash
-cd lambdas
-zip hello_lambda.zip lambda_function.py
-zip health_lambda.zip health_lambda.py
-```
-
-Or use the Makefile (from project root):
+Build the shared **layer** (Powertools) and both **Lambda zips** (handler-only; layer provides deps):
 
 ```bash
 make package
 ```
+
+This runs `package-layer`, `package-hello`, and `package-health`, producing `lambdas/dist/layer.zip`, `lambdas/dist/hello_lambda.zip`, and `lambdas/dist/health_lambda.zip`. Terraform attaches the layer to both functions.
 
 ### 3. Initialize Terraform
 
@@ -229,6 +234,23 @@ curl http://localhost:4566/restapis/{api-id}/dev/_user_request_/health
   "service": "api-gateway-lambda-dynamodb"
 }
 ```
+
+## Lambdas: development
+
+Each Lambda lives in its own folder under `lambdas/` and uses **uv** (or pip), **AWS Lambda Powertools** (Logger + Metrics) via a shared **layer**, **ruff** for linting, and **pytest** with **coverage**. The health Lambda uses **moto** to mock boto3/DynamoDB in tests.
+
+- **Run unit tests with coverage** (both Lambdas):
+  ```bash
+  make test-lambdas
+  ```
+  Or per Lambda: `cd lambdas/hello && uv sync --extra dev && uv run pytest --cov --cov-report=term-missing` (same for `lambdas/health`).
+
+- **Lint** (ruff):
+  ```bash
+  make lint-lambdas
+  ```
+
+- **Build only the layer or a single Lambda**: `make package-layer`, `make package-hello`, `make package-health`.
 
 ## Cleanup
 

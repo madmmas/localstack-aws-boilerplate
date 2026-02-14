@@ -1,0 +1,45 @@
+[project]
+name = "hello-lambda"
+version = "0.1.0"
+description = "Hello Lambda with Powertools"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aws-lambda-powertools>=2.36.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "ruff>=0.8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["handler.py"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["."]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["."]
+omit = ["tests/*", "**/__pycache__/*"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
