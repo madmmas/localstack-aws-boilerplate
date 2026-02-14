@@ -15,6 +15,30 @@ on:
       - '.github/workflows/test-lambdas.yml'
 
 jobs:
+  lint-lambdas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('lambdas/hello/pyproject.toml', 'lambdas/health/pyproject.toml') }}
+
+      - name: Run Lambda linting
+        run: make lint-lambdas
+
   test-lambdas:
     runs-on: ubuntu-latest
     steps:
