@@ -16,7 +16,6 @@ iac/*.tfvars
 # Lambda packages and build
 lambdas/*.zip
 lambdas/dist/
-lambdas/layer/build/
 lambdas/dist/staging_*/
 
 # Python

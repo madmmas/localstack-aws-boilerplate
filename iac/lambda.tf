@@ -1,4 +1,4 @@
-# Lambda function for hello endpoint (Powertools bundled in zip for LocalStack layer compatibility)
+# Lambda function for hello endpoint (common deps bundled in zip; no Lambda layer)
 resource "aws_lambda_function" "hello_lambda" {
   filename         = "../lambdas/dist/hello_lambda.zip"
   function_name   = "hello-lambda"
@@ -10,7 +10,7 @@ resource "aws_lambda_function" "hello_lambda" {
   depends_on = [aws_iam_role_policy_attachment.lambda_policy]
 }
 
-# Lambda function for health check endpoint (Powertools bundled in zip for LocalStack layer compatibility)
+# Lambda function for health check endpoint (common deps bundled in zip; no Lambda layer)
 resource "aws_lambda_function" "health_lambda" {
   filename         = "../lambdas/dist/health_lambda.zip"
   function_name   = "health-lambda"

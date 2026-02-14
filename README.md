@@ -32,10 +32,10 @@ This project demonstrates a simple setup using LocalStack to run AWS Lambda func
 │   ├── api_gateway.tf      # API Gateway resources
 │   └── outputs.tf          # Terraform outputs
 ├── lambdas/                # Lambda functions (each in its own folder)
-│   ├── layer/              # Shared Lambda layer (Powertools: Log + Metrics)
+│   ├── common/              # Common deps (Powertools) bundled into each zip at build time
 │   │   ├── requirements.txt
 │   │   └── README.md
-│   ├── dist/                # Built artifacts (layer.zip, *_lambda.zip); gitignored
+│   ├── dist/                # Built artifacts (*_lambda.zip); gitignored
 │   ├── hello/               # Hello Lambda (uv, pytest, ruff)
 │   │   ├── pyproject.toml
 │   │   ├── handler.py
@@ -99,13 +99,13 @@ Terraform and the API examples below use **us-east-1** (port 4566) by default.
 
 ### 2. Package Lambda Functions
 
-Build the shared **layer** (Powertools) and both **Lambda zips** (handler-only; layer provides deps):
+Build **common deps** (Powertools) and both **Lambda zips** (handler + common deps bundled in each; no Lambda layer):
 
 ```bash
 make package
 ```
 
-This runs `package-layer`, `package-hello`, and `package-health`, producing `lambdas/dist/layer.zip`, `lambdas/dist/hello_lambda.zip`, and `lambdas/dist/health_lambda.zip`. Terraform attaches the layer to both functions.
+This runs `build-common-deps`, `package-hello`, and `package-health`, producing `lambdas/dist/hello_lambda.zip` and `lambdas/dist/health_lambda.zip`. Common libs are bundled into each zip (Lambda layers are not used; not supported in LocalStack free).
 
 ### 3. Initialize Terraform
 
@@ -237,7 +237,7 @@ curl http://localhost:4566/restapis/{api-id}/dev/_user_request_/health
 
 ## Lambdas: development
 
-Each Lambda lives in its own folder under `lambdas/` and uses **uv** (or pip), **AWS Lambda Powertools** (Logger + Metrics) via a shared **layer**, **ruff** for linting, and **pytest** with **coverage**. The health Lambda uses **moto** to mock boto3/DynamoDB in tests.
+Each Lambda lives in its own folder under `lambdas/` and uses **uv** (or pip), **AWS Lambda Powertools** (Logger + Metrics) from **common deps** (bundled into each zip at build time), **ruff** for linting, and **pytest** with **coverage**. The health Lambda uses **moto** to mock boto3/DynamoDB in tests.
 
 - **Run unit tests with coverage** (both Lambdas):
   ```bash
@@ -250,7 +250,7 @@ Each Lambda lives in its own folder under `lambdas/` and uses **uv** (or pip), *
   make lint-lambdas
   ```
 
-- **Build only the layer or a single Lambda**: `make package-layer`, `make package-hello`, `make package-health`.
+- **Build common deps or a single Lambda**: `make build-common-deps`, `make package-hello`, `make package-health`.
 
 ## Cleanup
 

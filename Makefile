@@ -10,7 +10,7 @@ COMPOSE_PG    := $(COMPOSE_BASE) -f compose/postgres.yml
 .PHONY: up-postgres down-postgres
 .PHONY: up-localstack down-localstack up-all down-all
 .PHONY: package init apply destroy test clean output open-localstack open-localstack-w2
-.PHONY: package-layer package-hello package-health test-lambdas lint-lambdas
+.PHONY: build-common-deps package-hello package-health test-lambdas lint-lambdas
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -31,9 +31,9 @@ help: ## Show this help message
 	@echo '  open-localstack-w2        Open LocalStack us-west-2 in browser'
 	@echo ''
 	@echo 'Lambdas (uv, tests, lint):'
-	@echo '  package-layer             Build Lambda layer zip (Powertools)'
-	@echo '  package-hello             Build hello Lambda zip'
-	@echo '  package-health            Build health Lambda zip'
+	@echo '  build-common-deps         Build common deps (Powertools) for bundling'
+	@echo '  package-hello             Build hello Lambda zip (handler + common deps)'
+	@echo '  package-health            Build health Lambda zip (handler + common deps)'
 	@echo '  test-lambdas              Run unit tests with coverage'
 	@echo '  lint-lambdas              Run ruff on hello + health'
 	@echo ''
@@ -97,31 +97,27 @@ open-localstack: ## Open LocalStack us-east-1 in browser
 LAMBDAS_DIST := lambdas/dist
 PYTHON ?= python3
 
-package: package-hello package-health ## Package both Lambda zips (layer bundled in each for LocalStack)
+package: package-hello package-health ## Package both Lambda zips (common deps bundled in each; no Lambda layer)
 
-package-layer: ## Build Lambda layer zip (Powertools)
-	@mkdir -p $(LAMBDAS_DIST)
-	rm -rf lambdas/layer/build
-	mkdir -p lambdas/layer/build/python
-	$(PYTHON) -m pip install -q -t lambdas/layer/build/python -r lambdas/layer/requirements.txt
-	cd lambdas/layer/build && zip -rq ../../dist/layer.zip python
-	@echo "Built $(LAMBDAS_DIST)/layer.zip"
+build-common-deps: ## Build common deps into dist/deps for bundling into Lambda zips
+	@mkdir -p $(LAMBDAS_DIST)/deps
+	rm -rf $(LAMBDAS_DIST)/deps/*
+	$(PYTHON) -m pip install -q -t $(LAMBDAS_DIST)/deps -r lambdas/common/requirements.txt
+	@echo "Built $(LAMBDAS_DIST)/deps/"
 
-# Bundle layer into Lambda zip so LocalStack finds Powertools (LocalStack does not mount layers to /opt).
-# Layer has python/; Lambda PYTHONPATH is /var/task, so we put packages at zip root (not under python/).
-package-hello: package-layer ## Build hello Lambda zip (handler + Powertools bundled)
-	@mkdir -p $(LAMBDAS_DIST)/staging_hello $(LAMBDAS_DIST)/staging_hello_layer
+package-hello: build-common-deps ## Build hello Lambda zip (handler + common deps bundled)
+	@mkdir -p $(LAMBDAS_DIST)/staging_hello
 	rm -rf $(LAMBDAS_DIST)/staging_hello/*
 	cp lambdas/hello/handler.py $(LAMBDAS_DIST)/staging_hello/
-	cd $(LAMBDAS_DIST)/staging_hello_layer && unzip -oq ../layer.zip && cp -r python/* ../staging_hello/
+	cp -r $(LAMBDAS_DIST)/deps/* $(LAMBDAS_DIST)/staging_hello/
 	cd $(LAMBDAS_DIST)/staging_hello && zip -rq ../hello_lambda.zip .
 	@echo "Built $(LAMBDAS_DIST)/hello_lambda.zip"
 
-package-health: package-layer ## Build health Lambda zip (handler + Powertools bundled)
-	@mkdir -p $(LAMBDAS_DIST)/staging_health $(LAMBDAS_DIST)/staging_health_layer
+package-health: build-common-deps ## Build health Lambda zip (handler + common deps bundled)
+	@mkdir -p $(LAMBDAS_DIST)/staging_health
 	rm -rf $(LAMBDAS_DIST)/staging_health/*
 	cp lambdas/health/handler.py $(LAMBDAS_DIST)/staging_health/
-	cd $(LAMBDAS_DIST)/staging_health_layer && unzip -oq ../layer.zip && cp -r python/* ../staging_health/
+	cp -r $(LAMBDAS_DIST)/deps/* $(LAMBDAS_DIST)/staging_health/
 	cd $(LAMBDAS_DIST)/staging_health && zip -rq ../health_lambda.zip .
 	@echo "Built $(LAMBDAS_DIST)/health_lambda.zip"
 
@@ -176,8 +172,7 @@ test: ## Test the API (requires API_ID)
 
 clean: ## Clean up generated files
 	rm -rf $(LAMBDAS_DIST)
-	rm -rf lambdas/layer/build
-	rm -rf $(LAMBDAS_DIST)/staging_hello $(LAMBDAS_DIST)/staging_health $(LAMBDAS_DIST)/staging_hello_layer $(LAMBDAS_DIST)/staging_health_layer
+	rm -rf $(LAMBDAS_DIST)/staging_hello $(LAMBDAS_DIST)/staging_health
 	rm -f lambdas/*.zip
 	rm -rf iac/.terraform
 	rm -f iac/terraform.tfstate iac/terraform.tfstate.backup

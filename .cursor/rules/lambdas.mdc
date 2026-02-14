@@ -10,7 +10,7 @@ alwaysApply: false
 
 - **One Lambda per folder** under `lambdas/<name>/`: `handler.py`, `pyproject.toml`, `tests/`.
 - **Single entrypoint**: `handler.lambda_handler` (handler module at package root; Terraform handler = `handler.lambda_handler`).
-- **Shared deps via layer or bundle**: Use a shared layer (e.g. Powertools) or bundle deps in the zip for LocalStack compatibility.
+- **Shared deps via bundle**: Common deps (e.g. Powertools) live in `lambdas/common/` and are bundled into each Lambda zip at build time; no Lambda layer (not supported in LocalStack free).
 
 ## Observability (Powertools)
 
@@ -43,8 +43,8 @@ alwaysApply: false
 
 ## Packaging and deployment
 
-- **Zip contents**: Deployment zip must have `handler.py` at root and dependencies either in a layer (AWS) or bundled at zip root (e.g. `aws_lambda_powertools/` at root for LocalStack). Lambda runtime adds `/var/task` to `PYTHONPATH`, so packages must be at `/var/task` (not only under `python/` in the zip unless using a layer).
-- **pyproject.toml**: Use `[tool.hatch.build.targets.wheel]` with `only-include = ["handler.py"]` for flat layout. Include `aws-lambda-powertools` in dependencies; use a layer or bundle for deployment.
+- **Zip contents**: Deployment zip has `handler.py` at root and common deps (e.g. `aws_lambda_powertools/`) bundled at zip root. Lambda runtime adds `/var/task` to `PYTHONPATH`, so packages must be at zip root. No Lambda layer in this project.
+- **pyproject.toml**: Use `[tool.hatch.build.targets.wheel]` with `only-include = ["handler.py"]` for flat layout. Include `aws-lambda-powertools` in dependencies; common deps are bundled from `lambdas/common/` at package time.
 - **Linting**: Run ruff (e.g. `ruff check .`) with a consistent config; fix I001 (import order), F401 (unused imports), UP017 (e.g. `timezone.utc` vs `datetime.UTC` for compatibility).
 
 ## Terraform (when adding or changing Lambdas)
@@ -52,7 +52,7 @@ alwaysApply: false
 - **Handler**: Set `handler = "handler.lambda_handler"` and `runtime = "python3.11"`.
 - **Env vars**: Pass table names, endpoints, and region via `environment { variables = { ... } }`. No secrets in Terraform; use SSM/Secrets Manager in production.
 - **Timeout**: Set `timeout` for functions that call DynamoDB or HTTP.
-- **LocalStack**: For LocalStack, bundle Powertools in the deployment zip and omit layers so the function runs without layer mount issues.
+- **LocalStack**: Common deps are always bundled in the deployment zip (no Lambda layer; not supported in LocalStack free).
 
 ## Security and secrets
 
