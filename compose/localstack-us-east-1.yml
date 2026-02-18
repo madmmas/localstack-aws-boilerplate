@@ -15,9 +15,13 @@ services:
       - AWS_DEFAULT_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
+      # Hot reload: host path (Docker expects Mac path, not container path)
+      - HOST_LAMBDA_DIR=${PWD}
     volumes:
       - "./.localstack-us-east-1:/var/lib/localstack-us-east-1"
       - "/var/run/docker.sock:/var/run/docker.sock"
+      # Mount project for Lambda hot reloading (handler + deps at lambdas/dist/hot_*)
+      - ".:/opt/project"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
       interval: 10s

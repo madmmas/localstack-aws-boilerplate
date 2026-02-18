@@ -9,8 +9,9 @@ COMPOSE_PG    := $(COMPOSE_BASE) -f compose/postgres.yml
 .PHONY: up-localstack-us-west-2 down-localstack-us-west-2
 .PHONY: up-postgres down-postgres
 .PHONY: up-localstack down-localstack up-all down-all
-.PHONY: package init apply destroy test clean output open-localstack open-localstack-w2
-.PHONY: build-common-deps package-hello package-health test-lambdas lint-lambdas
+.PHONY: package init apply apply-hot plan plan-hot destroy test clean output open-localstack open-localstack-w2
+.PHONY: build-common-deps package-hello package-health prepare-hot-reload test-lambdas lint-lambdas
+.PHONY: docker-file-sharing watch-hot-reload
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -34,8 +35,15 @@ help: ## Show this help message
 	@echo '  build-common-deps         Build common deps (Powertools) for bundling'
 	@echo '  package-hello             Build hello Lambda zip (handler + common deps)'
 	@echo '  package-health            Build health Lambda zip (handler + common deps)'
+	@echo '  prepare-hot-reload        Build hot-reload dirs (handler symlinks + deps)'
 	@echo '  test-lambdas              Run unit tests with coverage'
 	@echo '  lint-lambdas              Run ruff on hello + health'
+	@echo ''
+	@echo 'Terraform (hot reload for dev):'
+	@echo '  plan-hot                  Plan with lambda_hot_reload=true'
+	@echo '  apply-hot                 Apply with hot reload (prepare-hot-reload + apply)'
+	@echo '  docker-file-sharing       Print path to add to Docker Desktop file sharing (macOS hot reload)'
+	@echo '  watch-hot-reload          Watch handler files and sync on save (run in separate terminal)'
 	@echo ''
 	@echo 'Terraform (recover state):'
 	@echo '  import-existing           Import existing LocalStack resources after state loss'
@@ -93,6 +101,20 @@ OPEN_CMD := $(if $(filter Darwin,$(shell uname -s)),open,xdg-open)
 open-localstack: ## Open LocalStack us-east-1 in browser
 	$(OPEN_CMD) https://app.localstack.cloud
 
+# ---- Docker file sharing (macOS hot reload) ----
+docker-file-sharing: ## Print path to add to Docker Desktop → Settings → Resources → File sharing (macOS)
+	@echo "Add this path to Docker Desktop → Settings → Resources → File sharing:"
+	@echo ""
+	@echo "  $(shell pwd)"
+	@echo ""
+	@echo "Then Apply & Restart. After restart, run: make down-localstack-us-east-1 && make up-localstack-us-east-1"
+
+watch-hot-reload: ## Watch handler files and sync on save. Run in a separate terminal. Needs: brew install fswatch
+	@$(MAKE) prepare-hot-reload
+	@echo "Watching lambdas/hello/handler.py lambdas/health/handler.py ... (Ctrl+C to stop)"
+	@command -v fswatch >/dev/null 2>&1 || { echo "Install fswatch: brew install fswatch"; exit 1; }
+	fswatch -o lambdas/hello/handler.py lambdas/health/handler.py | xargs -n1 -I{} $(MAKE) prepare-hot-reload
+
 # ---- Lambdas ----
 LAMBDAS_DIST := lambdas/dist
 PYTHON ?= python3
@@ -121,6 +143,15 @@ package-health: build-common-deps ## Build health Lambda zip (handler + common d
 	cd $(LAMBDAS_DIST)/staging_health && zip -rq ../health_lambda.zip .
 	@echo "Built $(LAMBDAS_DIST)/health_lambda.zip"
 
+prepare-hot-reload: build-common-deps ## Build hot-reload dirs (handlers + deps) for LocalStack. Re-run after editing handlers.
+	@mkdir -p $(LAMBDAS_DIST)/hot_hello $(LAMBDAS_DIST)/hot_health
+	rm -rf $(LAMBDAS_DIST)/hot_hello/* $(LAMBDAS_DIST)/hot_health/*
+	cp -r $(LAMBDAS_DIST)/deps/* $(LAMBDAS_DIST)/hot_hello/
+	cp -r $(LAMBDAS_DIST)/deps/* $(LAMBDAS_DIST)/hot_health/
+	cp lambdas/hello/handler.py $(LAMBDAS_DIST)/hot_hello/
+	cp lambdas/health/handler.py $(LAMBDAS_DIST)/hot_health/
+	@echo "Built hot-reload dirs: $(LAMBDAS_DIST)/hot_hello, $(LAMBDAS_DIST)/hot_health"
+
 test-lambdas: ## Run unit tests with coverage (hello + health)
 	cd lambdas/hello && uv sync --extra dev && uv run pytest --cov --cov-report=term-missing
 	cd lambdas/health && uv sync --extra dev && uv run pytest --cov --cov-report=term-missing
@@ -136,8 +167,14 @@ init: ## Initialize Terraform
 plan: init package ## Plan Terraform configuration
 	cd iac && terraform plan
 
+plan-hot: init prepare-hot-reload ## Plan Terraform with Lambda hot reload enabled
+	cd iac && terraform plan -var="lambda_hot_reload=true"
+
 apply: init package ## Apply Terraform configuration
 	cd iac && terraform apply
+
+apply-hot: init prepare-hot-reload ## Apply Terraform with Lambda hot reload (edit handlers, changes apply automatically)
+	cd iac && terraform apply -var="lambda_hot_reload=true"
 
 destroy: ## Destroy Terraform resources
 	cd iac && terraform destroy

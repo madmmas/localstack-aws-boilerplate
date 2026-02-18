@@ -1,24 +1,28 @@
 # Lambda function for hello endpoint (common deps bundled in zip; no Lambda layer)
 resource "aws_lambda_function" "hello_lambda" {
-  filename         = "../lambdas/dist/hello_lambda.zip"
-  function_name   = "hello-lambda"
-  role            = aws_iam_role.lambda_role.arn
-  handler         = "handler.lambda_handler"
-  runtime         = "python3.11"
-  source_code_hash = filebase64sha256("../lambdas/dist/hello_lambda.zip")
+  filename         = var.lambda_hot_reload ? null : "../lambdas/dist/hello_lambda.zip"
+  s3_bucket        = var.lambda_hot_reload ? "hot-reload" : null
+  s3_key           = var.lambda_hot_reload ? "$HOST_LAMBDA_DIR/lambdas/dist/hot_hello" : null
+  function_name    = "hello-lambda"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "handler.lambda_handler"
+  runtime          = "python3.11"
+  source_code_hash = var.lambda_hot_reload ? null : filebase64sha256("../lambdas/dist/hello_lambda.zip")
 
   depends_on = [aws_iam_role_policy_attachment.lambda_policy]
 }
 
 # Lambda function for health check endpoint (common deps bundled in zip; no Lambda layer)
 resource "aws_lambda_function" "health_lambda" {
-  filename         = "../lambdas/dist/health_lambda.zip"
-  function_name   = "health-lambda"
-  role            = aws_iam_role.lambda_role.arn
-  handler         = "handler.lambda_handler"
-  runtime         = "python3.11"
-  timeout         = 10
-  source_code_hash = filebase64sha256("../lambdas/dist/health_lambda.zip")
+  filename         = var.lambda_hot_reload ? null : "../lambdas/dist/health_lambda.zip"
+  s3_bucket        = var.lambda_hot_reload ? "hot-reload" : null
+  s3_key           = var.lambda_hot_reload ? "$HOST_LAMBDA_DIR/lambdas/dist/hot_health" : null
+  function_name    = "health-lambda"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "handler.lambda_handler"
+  runtime          = "python3.11"
+  timeout          = 10
+  source_code_hash = var.lambda_hot_reload ? null : filebase64sha256("../lambdas/dist/health_lambda.zip")
 
   environment {
     variables = {

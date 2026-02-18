@@ -252,6 +252,29 @@ Each Lambda lives in its own folder under `lambdas/` and uses **uv** (or pip), *
 
 - **Build common deps or a single Lambda**: `make build-common-deps`, `make package-hello`, `make package-health`.
 
+### Lambda hot reloading (LocalStack)
+
+To avoid redeploying after every code change, use LocalStack’s hot reloading. Handler edits are picked up automatically (within ~1s).
+
+1. Start LocalStack (compose files already mount the project for hot reload):
+   ```bash
+   make up-localstack-us-east-1
+   ```
+
+2. Apply Terraform with hot reload enabled:
+   ```bash
+   make apply-hot
+   ```
+
+3. **Run the watcher** in a separate terminal (requires `brew install fswatch`):
+   ```bash
+   make watch-hot-reload
+   ```
+
+4. Edit `lambdas/hello/handler.py` or `lambdas/health/handler.py` and save. The watcher copies changes into `lambdas/dist/hot_*`; LocalStack detects them within ~1s.
+
+Without the watcher, run `make prepare-hot-reload` manually after each handler edit. To add or change shared deps, run `make prepare-hot-reload` and then `make apply-hot` again.
+
 ## Cleanup
 
 **Terraform**
