@@ -30,7 +30,7 @@ env/
 ENV/
 
 # IDE
-.vscode/
+# exclude launch.json
 .idea/
 *.swp
 *.swo
@@ -39,3 +39,4 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+

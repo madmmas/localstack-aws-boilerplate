@@ -2,11 +2,13 @@
 COMPOSE_BASE  := -f docker-compose.yml
 COMPOSE_LS_E1 := $(COMPOSE_BASE) -f compose/localstack-us-east-1.yml
 COMPOSE_LS_W2 := $(COMPOSE_BASE) -f compose/localstack-us-west-2.yml
+COMPOSE_LS_DBG := $(COMPOSE_LS_E1) -f compose/localstack-debug.yml
 COMPOSE_PG    := $(COMPOSE_BASE) -f compose/postgres.yml
 
 .PHONY: help start stop restart
 .PHONY: up-localstack-us-east-1 down-localstack-us-east-1
 .PHONY: up-localstack-us-west-2 down-localstack-us-west-2
+.PHONY: up-localstack-debug down-localstack-debug
 .PHONY: up-postgres down-postgres
 .PHONY: up-localstack down-localstack up-all down-all
 .PHONY: package init apply apply-hot plan plan-hot destroy test clean output open-localstack open-localstack-w2
@@ -19,6 +21,7 @@ help: ## Show this help message
 	@echo 'Docker Compose (modular):'
 	@echo '  up-localstack-us-east-1   Start LocalStack us-east-1 (port 4566)'
 	@echo '  up-localstack-us-west-2   Start LocalStack us-west-2 (port 4567)'
+	@echo '  up-localstack-debug       Start LocalStack with Lambda debug port (19891)'
 	@echo '  up-postgres               Start PostgreSQL (port 5432)'
 	@echo '  up-localstack             Start both LocalStack regions'
 	@echo '  up-all                    Start LocalStack us-east-1 + Postgres'
@@ -69,6 +72,16 @@ up-localstack-us-west-2: ## Start LocalStack us-west-2
 
 down-localstack-us-west-2: ## Stop LocalStack us-west-2
 	docker-compose $(COMPOSE_LS_W2) down
+
+# ---- LocalStack with Lambda debugging ----
+up-localstack-debug: ## Start LocalStack us-east-1 with Lambda debug port 19891 (Python debugpy)
+	docker-compose $(COMPOSE_LS_DBG) up -d
+	@echo "Waiting for LocalStack (us-east-1 + debug) on :4566..."
+	@timeout 30 bash -c 'until curl -s http://localhost:4566/_localstack/health > /dev/null; do sleep 1; done' || true
+	@echo "LocalStack with Lambda debugging is ready. Debug port: 19891"
+
+down-localstack-debug: ## Stop LocalStack with debug overlay
+	docker-compose $(COMPOSE_LS_DBG) down
 
 # ---- Postgres ----
 up-postgres: ## Start PostgreSQL

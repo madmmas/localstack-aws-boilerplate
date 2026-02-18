@@ -18,6 +18,7 @@ This project demonstrates a simple setup using LocalStack to run AWS Lambda func
 ├── compose/                # Compose overlays (use with -f docker-compose.yml -f compose/<file>)
 │   ├── localstack-us-east-1.yml   # LocalStack us-east-1 (port 4566)
 │   ├── localstack-us-west-2.yml   # LocalStack us-west-2 (port 4567)
+│   ├── localstack-debug.yml       # Lambda debug overlay (port 19891)
 │   └── postgres.yml               # PostgreSQL (port 5432)
 ├── bootstrap/
 │   └── postgres/           # Postgres init scripts (run on first container start)
@@ -274,6 +275,28 @@ To avoid redeploying after every code change, use LocalStack’s hot reloading. 
 4. Edit `lambdas/hello/handler.py` or `lambdas/health/handler.py` and save. The watcher copies changes into `lambdas/dist/hot_*`; LocalStack detects them within ~1s.
 
 Without the watcher, run `make prepare-hot-reload` manually after each handler edit. To add or change shared deps, run `make prepare-hot-reload` and then `make apply-hot` again.
+
+### Lambda debugging (LocalStack)
+
+Debug Python Lambdas with breakpoints in VS Code using [debugpy](https://github.com/microsoft/debugpy).
+
+1. Start LocalStack with the debug overlay:
+   ```bash
+   make up-localstack-debug
+   ```
+
+2. Add debugpy to `lambdas/common/requirements.txt` (remove for production), run `make prepare-hot-reload`, and add to your handler (e.g. in `lambdas/hello/handler.py`):
+   ```python
+   import debugpy
+   debugpy.listen(("0.0.0.0", 19891))
+   debugpy.wait_for_client()  # blocks until debugger attaches
+   ```
+
+3. In VS Code, select **Run and Debug** → **Python: Remote Attach (LocalStack)** and start debugging.
+
+4. Invoke the Lambda (e.g. via API or `awslocal lambda invoke`). Execution will pause at your breakpoint.
+
+See `config/lambda-debug.yaml` for per-function port config (LocalStack Pro). The compose overlay exposes port 19891 for Python debugpy.
 
 ## Cleanup
 

@@ -1,0 +1,24 @@
+# LocalStack with Lambda debugging enabled.
+# Overlay: use with -f compose/localstack-us-east-1.yml -f compose/localstack-debug.yml
+#
+# Exposes Python debug port 19891 for debugpy. Add debugpy to your handler:
+#   import debugpy
+#   debugpy.listen(("0.0.0.0", 19891))
+#   debugpy.wait_for_client()
+#
+# Then attach from VS Code using "Python: Remote Attach (LocalStack)" launch config.
+
+services:
+  localstack-us-east-1:
+    ports:
+      - "127.0.0.1:4566:4566"
+      - "127.0.0.1:4510-4559:4510-4559"
+      - "127.0.0.1:19891:19891"  # Python debugpy port
+    environment:
+      # Expose debug port to Lambda containers (community edition)
+      - LAMBDA_DOCKER_FLAGS=-p 127.0.0.1:19891:19891
+      # Lambda Debug Mode (Pro): uncomment if using LocalStack Pro
+      # - LAMBDA_DEBUG_MODE=1
+      # - LAMBDA_DEBUG_MODE_CONFIG_PATH=/tmp/lambda-debug-config.yaml
+    volumes:
+      - "./config/lambda-debug.yaml:/tmp/lambda-debug-config.yaml:ro"
