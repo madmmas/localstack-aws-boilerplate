@@ -26,7 +26,7 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
             "Access-Control-Allow-Origin": "*",
         },
         "body": json.dumps({
-            "message": f"Hello, {name}! Your request ID is {context.aws_request_id}",
+            "message": f"Hello, {name}!",
             "event": event,
         }),
     }
